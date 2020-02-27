@@ -4,19 +4,21 @@ import matplotlib.pyplot as plt
 import pyaudio
 import matplotlib as mpl
 from time import sleep
+from scipy import signal
 mpl.rcParams['toolbar'] = 'None'
 #Default parameters *****************************************
 warnings.filterwarnings('ignore')
-SOUND_OUT = 1 #AUDIO OUT: 0: OFF / 1: ON
+SOUND_OUT = 0 #AUDIO OUT: 0: OFF / 1: ON
 GRAPH_OUT = 1 #SHOW WAVES: 0: OFF / 1: ON
+PSD_OUT = 1 #SHOW PSD via Welch Method: 0: OFF / 1: ON
 Fs = 44100 #SAMPING FREQ. [Hz] fs = 44.1KHz
 fc = 440.0 #Center frequency [Hz] : Default: 440.0Hz (=A)
 Ts = 0.01 #Symbol rate [sec]
 DTs = (int)(Fs*Ts) #Number of samples per symbol
 K = 8 #Number of sidelobes in shaped pulse [pulses]
 alpha = 0.4 #Rolloff factor : Default 0.4
-NUM_SYM = 300 #Number of symbols
-SNR = 3 #Signal-to-Noise power Ratio (SNR)[dB] : Default 10dB
+NUM_SYM = 10 #Number of symbols
+SNR = 10 #Signal-to-Noise power Ratio (SNR)[dB] : Default 10dB
 Gain = 10.0 #Gain for Audio output : Default 10.0
 #************************************************************
 
@@ -114,35 +116,44 @@ print('SNR[dB], BER: ',SNR,',',error/(NUM_SYM*2))
 if GRAPH_OUT == 1:
     #Plotting signal waveforms*************************
     plt.figure('Signal waveforms', figsize=(15,7))
-    plt.subplots_adjust(hspace=0.4)
-    plt.subplot(2,3,1,xlabel='[sec]')
+    plt.subplots_adjust(wspace=0.3,hspace=0.7)
+    plt.subplot(2+PSD_OUT,3,1,xlabel='[sec]')
     plt.title("Filter response")
     time_axis = np.arange(np.size(pulse)) * 1/Fs
     plt.plot(time_axis,pulse)
-    plt.subplot(2,3,2,xlabel='[sec]')
+    plt.subplot(2+PSD_OUT,3,2,xlabel='[sec]')
     plt.title("Modulated Signals")
     time_axis = np.arange(np.size(time_seq)) * 1/Fs
     plt.plot(time_axis,np.real(time_seq),label="Re")
     plt.plot(time_axis,np.imag(time_seq),label="Im")
     plt.legend(bbox_to_anchor=(1, 0), loc='lower right', borderaxespad=1)
-    plt.subplot(2,3,3,xlabel='[sec]')
+    plt.subplot(2+PSD_OUT,3,3,xlabel='[sec]')
     plt.title("Bandlimited Baseband Signals")
     time_axis = np.arange(np.size(trans_sig)) * 1/Fs
     plt.plot(time_axis,np.real(trans_sig),label="Re")
     plt.plot(time_axis,np.imag(trans_sig),label="Im")
     plt.legend(bbox_to_anchor=(1, 0), loc='lower right', borderaxespad=1)
-    plt.subplot(2,3,4,xlabel='[sec]')
+    plt.subplot(2+PSD_OUT,3,4,xlabel='[sec]')
     plt.title("Transmitted RF Signals")
     time_axis = np.arange(np.size(tr_waveform)) * 1/Fs
     plt.plot(time_axis,tr_waveform)
-    plt.subplot(2,3,5,xlabel='[sec]')
+    plt.subplot(2+PSD_OUT,3,5,xlabel='[sec]')
     plt.title("Received RF Signals")
     time_axis = np.arange(np.size(waveform)) * 1/Fs
     plt.plot(time_axis,waveform)
-    plt.subplot(2,3,6,xlabel='[sec]')
+    plt.subplot(2+PSD_OUT,3,6,xlabel='[sec]')
     plt.title("Received Baseband Signals")
     time_axis = np.arange(np.size(rec_signal_im)) * 1/Fs
     plt.plot(time_axis,rec_signal_re,label="Re")
     plt.plot(time_axis,rec_signal_im,label="Im")
     plt.legend(bbox_to_anchor=(1, 0), loc='lower right', borderaxespad=1)
+    if PSD_OUT == 1:
+        freq, Pw = signal.welch(tr_waveform, Fs, nperseg=DTs)
+        rfreq, rPw = signal.welch(waveform, Fs, nperseg=DTs)
+        plt.subplot(3,3,7,xlabel='Frequency[Hz]',ylabel='[dB/Hz]')
+        plt.title("PSD of RF Signals")
+        plt.plot(freq, 10*np.log10(Pw))
+        plt.subplot(3,3,8,xlabel='Frequency[Hz]',ylabel='[dB/Hz]')
+        plt.title("PSD of Received Sig.")
+        plt.plot(rfreq, 10*np.log10(rPw))
     plt.show()
