@@ -8,16 +8,17 @@ from scipy import signal
 mpl.rcParams['toolbar'] = 'None'
 #Default parameters *****************************************
 warnings.filterwarnings('ignore')
-SOUND_OUT = 0 #AUDIO OUT: 0: OFF / 1: ON
-GRAPH_OUT = 1 #SHOW WAVES: 0: OFF / 1: ON
-PSD_OUT = 1 #SHOW PSD via Welch Method: 0: OFF / 1: ON
+SOUND_OUT = 1 #AUDIO OUT: 0: OFF / 1: ON
+GRAPH_OUT = 0 #SHOW WAVES: 0: OFF / 1: ON
+PSD_OUT = 0 #SHOW PSD via Welch Method: 0: OFF / 1: ON
+PULSE = 0 #PULSE SHAPE: 0: RRC, 1: NRZ
 Fs = 44100 #SAMPING FREQ. [Hz] fs = 44.1KHz
 fc = 440.0 #Center frequency [Hz] : Default: 440.0Hz (=A)
 Ts = 0.01 #Symbol rate [sec]
 DTs = (int)(Fs*Ts) #Number of samples per symbol
 K = 8 #Number of sidelobes in shaped pulse [pulses]
 alpha = 0.4 #Rolloff factor : Default 0.4
-NUM_SYM = 10 #Number of symbols
+NUM_SYM = 300 #Number of symbols
 SNR = 10 #Signal-to-Noise power Ratio (SNR)[dB] : Default 10dB
 Gain = 10.0 #Gain for Audio output : Default 10.0
 #************************************************************
@@ -26,6 +27,12 @@ Gain = 10.0 #Gain for Audio output : Default 10.0
 def rrc_shaping(t):
     condlist = [t == 0.0, t == Ts/(4.0*alpha), t == - Ts/(4.0*alpha), (t!=0.0)&(t!=Ts/(4.0*alpha))&(t!=- Ts/(4.0*alpha))]
     funclist = [lambda t: 1.0 - alpha + 4.0 * alpha/np.pi, lambda t: alpha/np.sqrt(2) * ((1+2.0/np.pi) * np.sin(np.pi/(4.0*alpha)) +  (1.0 - 2.0/np.pi) * np.cos(np.pi/(4.0*alpha))), lambda t: alpha/np.sqrt(2) * ((1+2.0/np.pi) * np.sin(np.pi/(4.0*alpha)) +  (1.0 - 2.0/np.pi) * np.cos(np.pi/(4.0*alpha))), lambda t:1.0/(np.pi * t/Ts * (1.0 - np.power(4.0*alpha*t/Ts,2))) * (np.sin(np.pi * (1.0-alpha) * t/Ts) + 4.0*alpha*t/Ts*np.cos(np.pi*(1.0+alpha)*t/Ts))]
+    return np.piecewise(t.astype(dtype=np.float64), condlist, funclist)
+
+#Non-Return-to-Zero (NRZ) Pulse 
+def nrz_shaping(t):
+    condlist = [t < -0.5*Ts, t >= 0.5*Ts, (t>=-0.5*Ts)&(t<0.5*Ts)]
+    funclist = [lambda t: 0.0, lambda t: 0.0, lambda t:np.sqrt(1.0/Ts)]
     return np.piecewise(t.astype(dtype=np.float64), condlist, funclist)
 
 def mapping(x): #NOTE Gray-labeled QPSK
@@ -53,8 +60,12 @@ if SOUND_OUT == 1:
 #Transmission Main*****************************************
 
 #generating filter response
-#NOTE: 1/np.sqrt(Ts) is a normalization factor
-pulse = rrc_shaping(np.arange(-DTs*K,DTs*K+1) * 1.0/Fs) * 1.0/np.sqrt(Ts)
+if PULSE==0:
+    #NOTE: 1/np.sqrt(Ts) is a normalization factor
+    pulse = rrc_shaping(np.arange(-DTs*K,DTs*K+1) * 1.0/Fs) * 1.0/np.sqrt(Ts)
+else:
+    pulse = nrz_shaping(np.arange(-DTs*K,DTs*K+1) * 1.0/Fs)
+
 #Generate Discrete Signals
 data = np.random.randint(0,4,(NUM_SYM,1))
 #Mapping Data onto QPSK symbols
